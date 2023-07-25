@@ -2,7 +2,11 @@ import express from "express";
 import contactsController from "../../controllers/contacts-controller.js";
 import { validateBody } from "../../decorators/index.js";
 import contactShema from "../../shemas/contacts-shemas.js";
-import { isEmptyBody, isValidId } from "../../middlewares/index.js";
+import {
+  isEmptyBody,
+  isValidId,
+  isEmptyBodyFavorite,
+} from "../../middlewares/index.js";
 
 const router = express.Router();
 
@@ -30,7 +34,7 @@ router.put(
 router.patch(
   "/:contactId/favorite",
   isValidId,
-  isEmptyBody,
+  isEmptyBodyFavorite,
   validateBody(contactShema.contactUpdateFavoriteSchem),
   contactsController.updateFavorite
 );
