@@ -1,11 +1,17 @@
+import fs from "fs/promises";
+import path from "path";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import "dotenv/config";
+import gravatar from "gravatar";
+import Jimp from "jimp";
 import User from "../models/user.js";
 import { HttpError } from "../helpers/index.js";
 import { ctrlWrapper } from "../decorators/index.js";
 
 const { JWT_SECRET } = process.env;
+
+const avatarPath = path.resolve("public", "avatars");
 
 const register = async (req, res) => {
   const { email, password } = req.body;
@@ -14,11 +20,18 @@ const register = async (req, res) => {
     throw HttpError(409, "Email in use");
   }
   const hashPassword = await bcrypt.hash(password, 10);
-  const newUser = await User.create({ ...req.body, password: hashPassword });
+  const avatarURL = gravatar.url(email);
+
+  const newUser = await User.create({
+    ...req.body,
+    password: hashPassword,
+    avatarURL,
+  });
   res.status(201).json({
     user: {
       email: newUser.email,
       subscription: "starter",
+      avatarURL: newUser.avatarURL,
     },
   });
 };
@@ -76,10 +89,30 @@ const subscriptionUpdate = async (req, res) => {
   res.json(result);
 };
 
+const updateAvatar = async (req, res) => {
+  const { _id } = req.user;
+  const { path: oldPath, filename } = req.file;
+  try {
+    const img = await Jimp.read(oldPath);
+    img.resize(250, 250);
+    await img.writeAsync(oldPath);
+    req.file.path = oldPath;
+  } catch (err) {
+    console.error(err);
+  }
+  const filenameID = `${_id}_${filename}`;
+  const newPath = path.join(avatarPath, filenameID);
+  await fs.rename(oldPath, newPath);
+  const avatarURL = path.join("avatars", filenameID);
+  await User.findByIdAndUpdate(_id, { avatarURL });
+  res.status(200).json({ avatarURL });
+};
+
 export default {
   register: ctrlWrapper(register),
   login: ctrlWrapper(login),
   getCurrent: ctrlWrapper(getCurrent),
   logout: ctrlWrapper(logout),
   subscriptionUpdate: ctrlWrapper(subscriptionUpdate),
+  updateAvatar: ctrlWrapper(updateAvatar),
 };
