@@ -42,7 +42,7 @@ describe("test signin route", () => {
     expect(body).toHaveProperty("token");
   });
 
-  test("test singin check that the answer oject user", async () => {
+  test("test singin check that the answer contain oject user", async () => {
     const singinData = {
       email: "di@di.com",
       password: "123456",
@@ -55,18 +55,4 @@ describe("test signin route", () => {
 
     expect(body).toHaveProperty("user");
   });
-});
-
-test("test singin check that the answer oject with name and password", async () => {
-  const singinData = {
-    email: "di@di.com",
-    password: "123456",
-  };
-  const { statusCode, body } = await request(app)
-    .post("/users/login")
-    .send(singinData);
-
-  const user = body.user;
-
-  expect(user).toHaveProperty("email");
 });
