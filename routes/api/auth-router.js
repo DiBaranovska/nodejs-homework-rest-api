@@ -6,7 +6,7 @@ import usersSchemas from "../../shemas/users-schemas.js";
 
 import { validateBody } from "../../decorators/index.js";
 
-import { authenticate } from "../../middlewares/index.js";
+import { upload, authenticate } from "../../middlewares/index.js";
 
 const authRouter = express.Router();
 
@@ -27,5 +27,12 @@ authRouter.get("/current", authenticate, registerController.getCurrent);
 authRouter.post("/logout", authenticate, registerController.logout);
 
 authRouter.patch("/", authenticate, registerController.subscriptionUpdate);
+
+authRouter.patch(
+  "/avatars",
+  authenticate,
+  upload.single("avatar"),
+  registerController.updateAvatar
+);
 
 export default authRouter;
