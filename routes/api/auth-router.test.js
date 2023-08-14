@@ -55,4 +55,16 @@ describe("test signin route", () => {
 
     expect(body).toHaveProperty("user");
   });
+
+  test("test singin check that the answer contain oject user", async () => {
+    const singinData = {
+      email: "di@di.com",
+      password: "123456",
+    };
+    const { statusCode, body } = await request(app)
+      .post("/users/login")
+      .send(singinData);
+
+    expect.objectContaining(body);
+  });
 });
