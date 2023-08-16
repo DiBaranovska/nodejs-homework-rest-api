@@ -1,4 +1,6 @@
 import fs from "fs/promises";
+import sgMail from "@sendgrid/mail";
+import { nanoid } from "nanoid";
 import path from "path";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
@@ -9,7 +11,7 @@ import User from "../models/user.js";
 import { HttpError } from "../helpers/index.js";
 import { ctrlWrapper } from "../decorators/index.js";
 
-const { JWT_SECRET } = process.env;
+const { JWT_SECRET, SENDGRID_API_KEY, BASE_URL, EMAIL_FROM } = process.env;
 
 const avatarPath = path.resolve("public", "avatars");
 
@@ -22,17 +24,78 @@ const register = async (req, res) => {
   const hashPassword = await bcrypt.hash(password, 10);
   const avatarURL = gravatar.url(email);
 
+  const verificationToken = nanoid();
+
+  sgMail.setApiKey(SENDGRID_API_KEY);
+
   const newUser = await User.create({
     ...req.body,
     password: hashPassword,
     avatarURL,
+    verificationToken,
   });
+
+  const verifyEmail = {
+    to: email,
+    from: EMAIL_FROM,
+    subject: "Verify email",
+    html: `<a href="${BASE_URL}/users/verify/${verificationToken}" target="_blank">Click verify email</a>`,
+  };
+
+  sgMail
+    .send(verifyEmail)
+    .then(() => console.log("email sucess"))
+    .catch((error) => console.log(error.message));
+
   res.status(201).json({
     user: {
       email: newUser.email,
       subscription: "starter",
       avatarURL: newUser.avatarURL,
     },
+  });
+};
+
+const verify = async (req, res) => {
+  const { verificationToken } = req.params;
+  const user = await User.findOne({ verificationToken });
+  if (!user) {
+    throw HttpError(404, "User not found");
+  }
+
+  await User.findByIdAndUpdate(user._id, {
+    verify: true,
+    verificationToken: null,
+  });
+
+  res.status(200).json({ message: "Verification successful" });
+};
+
+const resendVerifyEmail = async (req, res) => {
+  const { email } = req.body;
+  const user = await User.findOne({ email });
+
+  if (!user) {
+    throw HttpError(404, "User not found");
+  }
+  if (user.verify) {
+    throw HttpError(400, "Verification has already been passed");
+  }
+
+  const verifyEmail = {
+    to: email,
+    from: EMAIL_FROM,
+    subject: "Verify email",
+    html: `<a href="${BASE_URL}/users/verify/${user.verificationToken}" target="_blank">Click verify email</a>`,
+  };
+
+  sgMail
+    .send(verifyEmail)
+    .then(() => console.log("email sucess"))
+    .catch((error) => console.log(error.message));
+
+  res.status(200).json({
+    message: "Verification email sent",
   });
 };
 
@@ -43,6 +106,9 @@ const login = async (req, res) => {
     throw HttpError(401, "Email or password is wrong");
   }
 
+  if (!user.verify) {
+    throw HttpError(401, "Please verify your email");
+  }
   const passwordCompare = await bcrypt.compare(password, user.password);
   if (!passwordCompare) {
     throw HttpError(401, "Email or password is wrong");
@@ -110,6 +176,8 @@ const updateAvatar = async (req, res) => {
 
 export default {
   register: ctrlWrapper(register),
+  verify: ctrlWrapper(verify),
+  resendVerifyEmail: ctrlWrapper(resendVerifyEmail),
   login: ctrlWrapper(login),
   getCurrent: ctrlWrapper(getCurrent),
   logout: ctrlWrapper(logout),
